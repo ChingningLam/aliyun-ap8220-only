@@ -72,3 +72,44 @@ if [ -f "$RUST_FILE" ]; then
 
 	cd $PKG_PATH && echo "rust has been fixed!"
 fi
+
+# 预置 OpenClash Mihomo (Clash Meta) 内核
+if [ -d *"luci-app-openclash"* ]; then
+	echo " "
+	echo "Start downloading OpenClash Mihomo (Clash Meta) kernel..."
+	OC_CORE_PATH="luci-app-openclash/root/etc/openclash/core"
+	mkdir -p "$OC_CORE_PATH"
+	# 根据 WRT_TARGET 选择对应架构
+	# 默认使用 arm64 架构，x86 平台使用 amd64
+	ARCH="arm64"
+	if [[ "${WRT_TARGET,,}" == *"x86"* ]]; then
+		ARCH="amd64"
+	fi
+	echo "Target platform: $WRT_TARGET, architecture: $ARCH"
+	# 获取最新版 Mihomo/Clash Meta 内核版本号
+	TAG_NAME=$(curl -sL "https://api.github.com/repos/MetaCubeX/mihomo/releases/latest" | jq -r ".tag_name" 2>/dev/null)
+	
+	# 如果获取失败或为空，则使用默认稳定版本 v1.19.2
+	if [ -z "$TAG_NAME" ] || [ "$TAG_NAME" = "null" ]; then
+		TAG_NAME="v1.19.2"
+		echo "Failed to fetch latest tag name via API, falling back to default: $TAG_NAME"
+	else
+		echo "Fetched latest Mihomo version: $TAG_NAME"
+	fi
+	# 下载并解压内核
+	# MetaCubeX 发布的文件名为: mihomo-linux-amd64-v1.19.2.gz 或 mihomo-linux-arm64-v1.19.2.gz
+	FILE_NAME="mihomo-linux-${ARCH}-${TAG_NAME}"
+	DOWNLOAD_URL="https://github.com/MetaCubeX/mihomo/releases/download/${TAG_NAME}/${FILE_NAME}.gz"
+	echo "Downloading kernel from: $DOWNLOAD_URL"
+	curl -sL -m 300 --retry 3 "$DOWNLOAD_URL" -o "$OC_CORE_PATH/clash_meta.gz"
+	
+	if [ -f "$OC_CORE_PATH/clash_meta.gz" ]; then
+		# 使用 gzip 解压（解压后文件会自动命名为 clash_meta）
+		gzip -d -f "$OC_CORE_PATH/clash_meta.gz"
+		chmod +x "$OC_CORE_PATH/clash_meta"
+		echo "OpenClash Mihomo kernel downloaded and configured successfully!"
+	else
+		echo "Error: Failed to download OpenClash Mihomo kernel!"
+	fi
+	cd $PKG_PATH
+fi
